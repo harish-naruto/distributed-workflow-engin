@@ -44,13 +44,13 @@ Building this engine requires tackling specific distributed systems challenges i
 - [ ] Define the `workflow.proto` file (Bidirectional streams for task dispatch and status updates).
 - [ ] Generate the Go gRPC code using `protoc`.
 - [ ] Define the core Go structs representing a Workflow, Task, and Instance.
-- [ ] Implement the YAML/JSON parser to unmarshal static definitions into Go structs.
+- [x] Implement the YAML/JSON parser to unmarshal static definitions into Go structs.
 
 ### Phase 2: Graph Logic & Validation
 *Note: This phase heavily utilizes graph algorithms.*
-- [ ] Implement an adjacency list representation of the parsed tasks.
-- [ ] Write a Topological Sort algorithm to map the execution order.
-- [ ] Implement Cycle Detection (e.g., via Kahn's algorithm or DFS) to reject invalid workflows.
+- [x] Implement an adjacency list representation of the parsed tasks.
+- [x] Implement Cycle Detection (e.g., via Kahn's algorithm or DFS) to reject invalid workflows.
+- [x] Write a Topological Sort algorithm to map the execution order.
 
 ### Phase 3: The gRPC Communication Layer
 - [ ] Build the gRPC Server in the Coordinator to accept worker registrations.
