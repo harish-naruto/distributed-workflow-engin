@@ -10,7 +10,7 @@ type Workflow struct{
 type Task struct{
 	Id string `yaml:"id"`
 	Type string	`yaml:"type"`
-	Retires int	`yaml:"retires"`
+	Retries int	`yaml:"retries"`
 	Parameters any `yaml:"parameters"`//need alternative for this
 	DependOn []string `yaml:"dependOn"`
 }
