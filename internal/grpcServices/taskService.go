@@ -14,6 +14,10 @@ type TaskService struct {
 	workflow.UnimplementedTaskServiceServer
 }
 
+/*
+AssignTask receive task from Grpc stream.
+Assign task to executor engine for execution
+*/
 func (Ts *TaskService) AssignTask(stream grpc.BidiStreamingServer[workflow.TaskDetail,workflow.TaskStatus]) error {
 	var wg sync.WaitGroup
 	tasks := make(chan *workflow.TaskDetail)
@@ -34,17 +38,17 @@ func (Ts *TaskService) AssignTask(stream grpc.BidiStreamingServer[workflow.TaskD
 	}()
 
 	var SendMux sync.Mutex
-		for task := range tasks{
-			wg.Add(1)
-			go func(t *workflow.TaskDetail) {
-				defer wg.Done()
-				ts := executor.Executor(t)
-				log.Println("task executed: ",ts.Id)
-				SendMux.Lock()
-				defer SendMux.Unlock()
-				stream.Send(ts)
-			}(task)
-		}
+	for task := range tasks{
+		wg.Add(1)
+		go func(t *workflow.TaskDetail) {
+			defer wg.Done()
+			ts := executor.Executor(t)
+			log.Println("task executed: ",ts.Id)
+			SendMux.Lock()
+			defer SendMux.Unlock()
+			stream.Send(ts)
+		}(task)
+	}
 	wg.Wait()
 	return nil
 

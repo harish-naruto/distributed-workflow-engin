@@ -19,6 +19,9 @@ type WorkflowInfo struct {
 
 }
 
+// TaskSchedular schedules workflow tasks based on their dependencies.
+// It sends ready tasks to the executor and schedules dependent tasks
+// as their prerequisites complete.
 func TaskSchedular(conn workflow.TaskServiceClient,graph map[string][]string){
 	stream, err := conn.AssignTask(context.Background())
 	if err != nil {
@@ -33,7 +36,6 @@ func TaskSchedular(conn workflow.TaskServiceClient,graph map[string][]string){
 	defer close(sendChannel)
 	recivChannel := make(chan *workflow.TaskStatus)
 
-
 	// Preprocess this indegree and store it in db
 	inDegree := make(map[string]int)
 	for dependency := range graph {
@@ -41,21 +43,20 @@ func TaskSchedular(conn workflow.TaskServiceClient,graph map[string][]string){
 			inDegree[task]++;
 		}
 	}
-	//Task sender go Routine
-	go func() {
-		for msg := range sendChannel {
-			sendLock.Lock()
-			if err := stream.Send(msg); err !=nil {
-				//handle fail send 
-				taskWait.Done()
-				log.Println("Send Error: ",err.Error())
-			}
-			log.Println("task send: ",msg.Id)
-			sendLock.Unlock()
-		}
-	}()
 
-	// send zero degree task to send channel
+	workflowInfo := WorkflowInfo{
+		Stream: stream,
+		Workflow: graph,
+		SendChannel: sendChannel,
+		RecivChannel: recivChannel,
+		InDegree: inDegree,
+	}
+	
+	go workflowInfo.WriteStream(&sendLock,&taskWait)
+
+	go workflowInfo.ReadStream(&taskWait)
+
+	// send first zero degree task to send channel
 	for task := range graph {
 		if inDegree[task] == 0 {
 			taskWait.Add(1)
@@ -65,51 +66,16 @@ func TaskSchedular(conn workflow.TaskServiceClient,graph map[string][]string){
 		}
 	}
 
-	// receive finished task
-	go func() {
-		defer close(recivChannel)
-		for {
-			data,err := stream.Recv()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				log.Print("Receive Error: ",err.Error())
-				return
-			}
-			recivChannel <- data
-		}
-	}()
-
-	go func() {
-		for msg := range recivChannel {
-			if msg.Status == "Completed" {
-				//change this to a method implementation
-				for _,task := range graph[msg.Id] {
-					inDegree[task]--
-					if inDegree[task] == 0 {
-						taskWait.Add(1)
-						sendChannel <- &workflow.TaskDetail{
-							Id: task,
-						}
-					}
-				}
-			}else{
-				// Handle retry logic here 
-				// temp retry
-				taskWait.Add(1)
-				sendChannel <- &workflow.TaskDetail{
-					Id: msg.GetId(),
-				}
-			}
-			log.Println("Task Completed : ",msg.Id)
-			taskWait.Done()
-		}		
-	}()
+	go workflowInfo.UpdateDependency(&taskWait)
+	
 	taskWait.Wait()
 	stream.CloseSend()
 }
 
+/*
+ WriteStream reads tasks from SendChannel and sends them to the
+ executor through the gRPC stream.
+*/
 func (wfi *WorkflowInfo) WriteStream(sendLock *sync.Mutex, taskWait *sync.WaitGroup)  {
 	for task := range wfi.SendChannel {
 		sendLock.Lock()
@@ -121,6 +87,10 @@ func (wfi *WorkflowInfo) WriteStream(sendLock *sync.Mutex, taskWait *sync.WaitGr
 	}
 }
 
+/*
+ReadStream receives task execution status from the gRPC stream
+and forwards it to RecivChannel.
+*/
 func (wfi *WorkflowInfo) ReadStream(taskWait *sync.WaitGroup)  {
 	defer close(wfi.RecivChannel)
 	for {
@@ -135,7 +105,12 @@ func (wfi *WorkflowInfo) ReadStream(taskWait *sync.WaitGroup)  {
 		wfi.RecivChannel <- status
 	}	
 }
-func (wfi *WorkflowInfo) UpdateInDegree(taskWait *sync.WaitGroup)  {
+/*
+UpdateDependency updates task dependencies after execution.
+When a task's dependencies are resolved, it is sent for execution.
+Failed tasks are rescheduled.
+*/
+func (wfi *WorkflowInfo) UpdateDependency(taskWait *sync.WaitGroup)  {
 	for task := range wfi.RecivChannel {
 		if task.Status == "Completed" {
 			for _,node := range wfi.Workflow[task.Id] {
