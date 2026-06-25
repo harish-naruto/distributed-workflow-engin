@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package workflow;
+
+option go_package = "./workflow";  
+
+message TaskDetail {
+  string id = 1;
+}
+
+message TaskStatus {
+  string id = 1;
+  string status = 2;  
+}
+service TaskService {
+  rpc AssignTask(stream TaskDetail) returns (stream TaskStatus);
+}
