@@ -62,7 +62,7 @@ Building this engine requires tackling specific distributed systems challenges i
 - [ ] Write the Coordinator's "State Updater": accurately transition task states (Pending -> Running -> Success/Failed).
 - [ ] Implement the "Dependency Resolver": when a task succeeds, check the DAG to find newly unblocked tasks and push them to the Dispatch Queue.
 - [ ] Implement retry logic for transient worker failures based on YAML definitions.
-
+  
 ### Phase 5: Task Execution 
 - [ ] Implement a `TaskRunner` interface on the Worker node.
 - [ ] Build specific task executors (e.g., `PostgresExecutor`, `HttpExecutor`, `SleepExecutor` for testing).

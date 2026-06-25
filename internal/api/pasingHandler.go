@@ -5,6 +5,8 @@ import (
 	"io"
 	"log"
 	"mime/multipart"
+
+	"github.com/Harish-Naruto/Distributed-Workflow-Engin/internal/dag"
 	"github.com/Harish-Naruto/Distributed-Workflow-Engin/internal/models"
 	"github.com/Harish-Naruto/Distributed-Workflow-Engin/internal/validator"
 	"gopkg.in/yaml.v3"
@@ -25,8 +27,16 @@ func WorkflowUploadHandler(file *multipart.FileHeader) error {
 	}
 
 	// generate garph and validate the graph
-	log.Println(workflow)
+	graph := make(map[string][]string)
+	if err := dag.DagGenerator(workflow,graph); err!= nil {
+		return errors.New(err.Error())
+	}
 
+	order,err := dag.ExecutionOrderGenerator(graph)
+	if err != nil {
+		return err
+	}
+	log.Print("order of execution for this graph is : ", order)
 	return nil
 }
 
@@ -50,7 +60,6 @@ func ExtractContent(file *multipart.FileHeader) ([]byte,error) {
 	}
 	return content,nil
 }
-
 /*
 Parse yaml file into Workflow struct
 */	
